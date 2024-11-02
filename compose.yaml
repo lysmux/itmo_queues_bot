@@ -1,0 +1,67 @@
+name: "itmo_queues_bot"
+
+services:
+  bot:
+    restart: unless-stopped
+    container_name: "itmo_queues_bot"
+    build:
+      context: .
+      target: dev
+    command: --reload
+    ports:
+      - "8000:8000" # webhook
+    volumes:
+      - "./app:/opt/app:ro"
+      - "./tests:/opt/tests:ro"
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      - DATABASE_HOST=${DATABASE_HOST:-db}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_NAME=${DATABASE_NAME:?error}
+      - DATABASE_USER=${DATABASE_USER:?error}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:?error}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?error}
+
+  db:
+    restart: unless-stopped
+    container_name: "itmo_queues_bot_db"
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - internal
+    environment:
+      - POSTGRES_DB=${DATABASE_NAME:?error}
+      - POSTGRES_USER=${DATABASE_USER:?error}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD:?error}
+
+  redis:
+    restart: unless-stopped
+    container_name: "itmo_queues_bot_redis"
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
+    command: --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    networks:
+      - internal
+
+volumes:
+  db-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  internal:
